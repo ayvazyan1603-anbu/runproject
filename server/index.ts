@@ -608,7 +608,11 @@ app.post('/api/verify', async (req, res) => {
   }
 });
 
-const PORT = 3001;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+export default app;
+
+if (!process.env.VERCEL) {
+  const PORT = process.env.PORT || 3001;
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}
