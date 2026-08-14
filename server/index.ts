@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import mysql from 'mysql2/promise';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -34,11 +34,11 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 const db = mysql.createPool({
-  host: process.env.DB_HOST,
-  port: Number(process.env.DB_PORT || 3306),
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
+  host: process.env['DB_HOST'] || 'u13.joingame.kz',
+  port: Number(process.env['DB_PORT'] || 3306),
+  database: process.env['DB_NAME'] || 'sql_9326_free',
+  user: process.env['DB_USER'] || 'sql_9326_free',
+  password: process.env['DB_PASSWORD'] || 'KkrmQZqkfL',
 });
 
 /**
@@ -57,84 +57,92 @@ interface ServerInfo {
 
 function querySourceServer(ip: string, port: number, timeoutMs = 2500): Promise<ServerInfo> {
   return new Promise((resolve) => {
-    const client = dgram.createSocket('udp4');
+    const client = dgram.createSocket("udp4");
     let isClosed = false;
 
     const safeClose = () => {
       if (!isClosed) {
         isClosed = true;
-        try { client.close(); } catch { /* ignore */ }
+        try { client.close(); } catch {}
       }
     };
 
-    const sendQuery = (chBuf?: Buffer) => {
-      const header = Buffer.from([0xFF, 0xFF, 0xFF, 0xFF, 0x54]);
-      const payload = Buffer.from('Source Engine Query\x00');
-      const buf = chBuf ? Buffer.concat([header, payload, chBuf]) : Buffer.concat([header, payload]);
-      client.send(buf, port, ip, (err) => {
-        if (err) safeClose();
-      });
+    const A2S_INFO = Buffer.from([
+      0xFF, 0xFF, 0xFF, 0xFF, 0x54, 0x53, 0x6F, 0x75, 0x72, 0x63, 0x65, 0x20, 0x45, 0x6E, 0x67, 0x69,
+      0x6E, 0x65, 0x20, 0x51, 0x75, 0x65, 0x72, 0x79, 0x00
+    ]);
+
+    const sendQuery = () => {
+      try {
+        client.send(A2S_INFO, 0, A2S_INFO.length, port, ip);
+      } catch {
+        safeClose();
+        resolve({
+          name: "RUH | CS2 Server",
+          map: "de_dust2",
+          players: 0,
+          maxPlayers: 30,
+          bots: 0,
+          status: "online",
+          ip,
+          port,
+        });
+      }
     };
 
-    client.on('message', (msg) => {
-      if (msg.length < 5) return;
-      const type = msg[4];
+    client.on("message", (msg) => {
+      try {
+        if (msg.length < 6) return;
 
-      if (type === 0x41 && msg.length >= 9) {
-        // Challenge response S2C_CHALLENGE (0x41)
-        const challenge = msg.subarray(5, 9);
-        sendQuery(challenge);
-      } else if (type === 0x49) {
-        // A2S_INFO response (0x49)
-        try {
-          let offset = 5;
-          const protocol = msg[offset++];
+        let offset = 4;
+        const header = msg[offset++];
+        if (header !== 0x49) return;
 
-          const readString = () => {
-            const start = offset;
-            while (offset < msg.length && msg[offset] !== 0) offset++;
-            const str = msg.toString('utf8', start, offset);
-            offset++;
-            return str;
-          };
+        const readString = (): string => {
+          const end = msg.indexOf(0x00, offset);
+          if (end === -1) return "";
+          const str = msg.toString("utf8", offset, end);
+          offset = end + 1;
+          return str;
+        };
 
-          const name = readString() || "RUH | CS2 Server";
-          const map = readString() || "de_dust2";
-          const folder = readString();
-          const game = readString();
-          const steamAppId = msg.readUInt16LE(offset); offset += 2;
-          const players = msg[offset++];
-          const maxPlayers = msg[offset++];
-          const bots = msg[offset++];
+        const protocol = msg[offset++];
+        const name = readString();
+        const map = readString();
+        const folder = readString();
+        const game = readString();
+        const steamAppId = msg.readUInt16LE(offset); offset += 2;
+        const players = msg[offset++] ?? 0;
+        const maxPlayers = msg[offset++] ?? 30;
+        const bots = msg[offset++] ?? 0;
 
-          safeClose();
-          resolve({
-            name,
-            map,
-            players,
-            maxPlayers,
-            bots,
-            status: "online",
-            ip,
-            port,
-          });
-        } catch {
-          safeClose();
-          resolve({
-            name: "RUH | CS2 Server",
-            map: "de_dust2",
-            players: 0,
-            maxPlayers: 30,
-            bots: 0,
-            status: "online",
-            ip,
-            port,
-          });
-        }
+        safeClose();
+        resolve({
+          name,
+          map,
+          players,
+          maxPlayers,
+          bots,
+          status: "online",
+          ip,
+          port,
+        });
+      } catch {
+        safeClose();
+        resolve({
+          name: "RUH | CS2 Server",
+          map: "de_dust2",
+          players: 0,
+          maxPlayers: 30,
+          bots: 0,
+          status: "online",
+          ip,
+          port,
+        });
       }
     });
 
-    client.on('error', () => {
+    client.on("error", () => {
       safeClose();
       resolve({
         name: "RUH | CS2 Server",
@@ -188,7 +196,7 @@ async function initDb() {
 
 initDb();
 
-app.get('/api/server-status', async (req, res) => {
+app.get('/api/server-status', async (req: Request, res: Response): Promise<void> => {
   try {
     const info = await querySourceServer("79.143.20.204", 27024);
     res.json(info);
@@ -206,7 +214,7 @@ app.get('/api/server-status', async (req, res) => {
   }
 });
 
-app.get('/api/servers', async (req, res) => {
+app.get('/api/servers', async (req: Request, res: Response): Promise<void> => {
   try {
     const liveInfo = await querySourceServer("79.143.20.204", 27024);
     const serversList = [
@@ -237,10 +245,10 @@ app.get('/api/servers', async (req, res) => {
   }
 });
 
-app.get('/api/ranks', async (req, res) => {
+app.get('/api/ranks', async (req: Request, res: Response): Promise<void> => {
   try {
-    const [rows] = await db.query(
-      'SELECT steam, name, kills, deaths, shoots, hits, headshots, assists, round_win, round_lose, playtime, lastconnect, `rank` FROM ranks_statistics ORDER BY `rank` DESC LIMIT 100'
+    const [rows] = await db.query<any[]>(
+      'SELECT steam as steamid, name as nickname, `rank` as points, kills, deaths, playtime as hours FROM ranks_statistics ORDER BY `rank` DESC LIMIT 100'
     );
     res.json(rows);
   } catch (err) {
@@ -249,33 +257,24 @@ app.get('/api/ranks', async (req, res) => {
   }
 });
 
-app.get('/api/bans', async (req, res) => {
+app.get('/api/punishments', async (req: Request, res: Response): Promise<void> => {
   try {
-    const [rows] = await db.query(
-      'SELECT player_name, player_steamid, reason, type, admin_name, created, end, status FROM sa_bans ORDER BY created DESC LIMIT 50'
+    const [bans] = await db.query<any[]>(
+      'SELECT id, player_name as nickname, type, reason, admin_name as admin, DATE_FORMAT(created, "%d.%m.%Y") as date, "Навсегда" as duration FROM sa_bans ORDER BY created DESC LIMIT 50'
     );
-    res.json(rows);
+    const [mutes] = await db.query<any[]>(
+      'SELECT id, player_name as nickname, type, reason, admin_name as admin, DATE_FORMAT(created, "%d.%m.%Y") as date, "Навсегда" as duration FROM sa_mutes ORDER BY created DESC LIMIT 50'
+    );
+    res.json([...bans, ...mutes]);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Database error' });
   }
 });
 
-app.get('/api/mutes', async (req, res) => {
+app.get('/api/player/:steamid', async (req: Request, res: Response): Promise<void> => {
   try {
-    const [rows] = await db.query(
-      'SELECT player_name, player_steamid, reason, type, admin_name, created, end, status FROM sa_mutes ORDER BY created DESC LIMIT 50'
-    );
-    res.json(rows);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Database error' });
-  }
-});
-
-app.get('/api/player/:steamid', async (req, res) => {
-  try {
-    const steamid = req.params.steamid;
+    const steamid = req.params['steamid'] || '';
     let accountId = 0;
     try {
       const sid = BigInt(steamid);
@@ -325,9 +324,9 @@ app.get('/api/player/:steamid', async (req, res) => {
   }
 });
 
-app.get('/api/vip/:steamid', async (req, res) => {
+app.get('/api/vip/:steamid', async (req: Request, res: Response): Promise<void> => {
   try {
-    const steamid = req.params.steamid;
+    const steamid = req.params['steamid'] || '';
     let accountId = 0;
     try {
       const sid = BigInt(steamid);
@@ -350,11 +349,12 @@ app.get('/api/vip/:steamid', async (req, res) => {
   }
 });
 
-app.post('/api/vip/grant', async (req, res) => {
+app.post('/api/vip/grant', async (req: Request, res: Response): Promise<void> => {
   try {
     const { steamid, group, days } = req.body;
     if (!steamid || !group || !days) {
-      return res.status(400).json({ error: 'Missing parameters' });
+      res.status(400).json({ error: 'Missing parameters' });
+      return;
     }
     let accountId = 0;
     try {
@@ -396,11 +396,11 @@ app.post('/api/vip/grant', async (req, res) => {
   }
 });
 
-app.get('/api/models/:steamid', async (req, res) => {
+app.get('/api/models/:steamid', async (req: Request, res: Response): Promise<void> => {
   try {
     const [rows] = await db.query<any[]>(
       'SELECT ct_model, t_model FROM ruh_player_models WHERE steamid = ?',
-      [req.params.steamid]
+      [req.params['steamid']]
     );
     res.json(rows[0] || { ct_model: null, t_model: null });
   } catch (err) {
@@ -409,10 +409,13 @@ app.get('/api/models/:steamid', async (req, res) => {
   }
 });
 
-app.post('/api/models', async (req, res) => {
+app.post('/api/models', async (req: Request, res: Response): Promise<void> => {
   try {
     const { steamid, ct_model, t_model } = req.body;
-    if (!steamid) return res.status(400).json({ error: 'Missing steamid' });
+    if (!steamid) {
+      res.status(400).json({ error: 'Missing steamid' });
+      return;
+    }
 
     await db.query(
       `INSERT INTO ruh_player_models (steamid, ct_model, t_model) 
@@ -427,14 +430,15 @@ app.post('/api/models', async (req, res) => {
   }
 });
 
-app.get('/api/skins/:steamid', async (req, res) => {
+app.get('/api/skins/:steamid', async (req: Request, res: Response): Promise<void> => {
   try {
     const [rows] = await db.query<any[]>(
       'SELECT knife, gloves, ct_model, t_model, skins_json FROM ruh_player_skins WHERE steamid = ?',
-      [req.params.steamid]
+      [req.params['steamid']]
     );
     if (!rows[0]) {
-      return res.json({ knife: null, gloves: null, ct_model: null, t_model: null, skins: {} });
+      res.json({ knife: null, gloves: null, ct_model: null, t_model: null, skins: {} });
+      return;
     }
     const skins = rows[0].skins_json ? JSON.parse(rows[0].skins_json) : {};
     res.json({
@@ -450,10 +454,13 @@ app.get('/api/skins/:steamid', async (req, res) => {
   }
 });
 
-app.post('/api/skins', async (req, res) => {
+app.post('/api/skins', async (req: Request, res: Response): Promise<void> => {
   try {
     const { steamid, knife, gloves, ct_model, t_model, skins } = req.body;
-    if (!steamid) return res.status(400).json({ error: 'Missing steamid' });
+    if (!steamid) {
+      res.status(400).json({ error: 'Missing steamid' });
+      return;
+    }
 
     const skinsJson = skins ? JSON.stringify(skins) : '{}';
 
@@ -486,11 +493,12 @@ app.post('/api/skins', async (req, res) => {
   }
 });
 
-app.post('/api/tickets', async (req, res) => {
+app.post('/api/tickets', async (req: Request, res: Response): Promise<void> => {
   try {
     const { steamid, player_name, subject, category, message } = req.body;
     if (!steamid || !subject || !category || !message) {
-      return res.status(400).json({ error: 'Missing required parameters' });
+      res.status(400).json({ error: 'Missing required parameters' });
+      return;
     }
     
     await db.query(
@@ -504,11 +512,11 @@ app.post('/api/tickets', async (req, res) => {
   }
 });
 
-app.get('/api/tickets/:steamid', async (req, res) => {
+app.get('/api/tickets/:steamid', async (req: Request, res: Response): Promise<void> => {
   try {
     const [rows] = await db.query(
       'SELECT * FROM ruh_tickets WHERE steamid = ? ORDER BY created_at DESC',
-      [req.params.steamid]
+      [req.params['steamid']]
     );
     res.json(rows);
   } catch (err) {
@@ -525,16 +533,17 @@ const VOUCHER_PRICES: Record<string, number> = {
   "RUH": 10999
 };
 
-app.post('/api/orders', upload.single('screenshot'), async (req, res) => {
+app.post('/api/orders', upload.single('screenshot'), async (req: Request, res: Response): Promise<void> => {
   try {
     const { steamid, voucher, discord_id, player_name } = req.body;
     if (!steamid || !voucher) {
-      return res.status(400).json({ error: 'Missing required parameters (steamid, voucher)' });
+      res.status(400).json({ error: 'Missing required parameters (steamid, voucher)' });
+      return;
     }
 
     const price = VOUCHER_PRICES[voucher] || 1499;
     const filename = req.file ? req.file.filename : null;
-    const baseUrl = process.env.VITE_SITE_URL || 'http://localhost:3001';
+    const baseUrl = process.env['VITE_SITE_URL'] || 'http://localhost:3001';
     const screenshot_url = filename ? `${baseUrl}/uploads/${filename}` : null;
 
     const [result] = await db.query<any>(
@@ -572,11 +581,12 @@ app.post('/api/orders', upload.single('screenshot'), async (req, res) => {
   }
 });
 
-app.post('/api/verify', async (req, res) => {
+app.post('/api/verify', async (req: Request, res: Response): Promise<void> => {
   try {
     const { discord_id, steamid, player_name } = req.body;
     if (!discord_id || !steamid) {
-      return res.status(400).json({ error: 'discord_id and steamid required' });
+      res.status(400).json({ error: 'discord_id and steamid required' });
+      return;
     }
 
     await db.query(
@@ -610,8 +620,8 @@ app.post('/api/verify', async (req, res) => {
 
 export default app;
 
-if (!process.env.VERCEL) {
-  const PORT = process.env.PORT || 3001;
+if (!process.env['VERCEL']) {
+  const PORT = process.env['PORT'] || 3001;
   app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
   });
