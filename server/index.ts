@@ -17,6 +17,11 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+function getParamString(param: unknown): string {
+  if (Array.isArray(param)) return String(param[0] || '');
+  return String(param || '');
+}
+
 // Ensure uploads folder exists and serve statically
 const uploadsDir = path.join(__dirname, '..', 'uploads');
 if (!fs.existsSync(uploadsDir)) {
@@ -274,7 +279,7 @@ app.get('/api/punishments', async (req: Request, res: Response): Promise<void> =
 
 app.get('/api/player/:steamid', async (req: Request, res: Response): Promise<void> => {
   try {
-    const steamid = req.params['steamid'] || '';
+    const steamid = getParamString(req.params['steamid']);
     let accountId = 0;
     try {
       const sid = BigInt(steamid);
@@ -326,7 +331,7 @@ app.get('/api/player/:steamid', async (req: Request, res: Response): Promise<voi
 
 app.get('/api/vip/:steamid', async (req: Request, res: Response): Promise<void> => {
   try {
-    const steamid = req.params['steamid'] || '';
+    const steamid = getParamString(req.params['steamid']);
     let accountId = 0;
     try {
       const sid = BigInt(steamid);
@@ -398,9 +403,10 @@ app.post('/api/vip/grant', async (req: Request, res: Response): Promise<void> =>
 
 app.get('/api/models/:steamid', async (req: Request, res: Response): Promise<void> => {
   try {
+    const steamid = getParamString(req.params['steamid']);
     const [rows] = await db.query<any[]>(
       'SELECT ct_model, t_model FROM ruh_player_models WHERE steamid = ?',
-      [req.params['steamid']]
+      [steamid]
     );
     res.json(rows[0] || { ct_model: null, t_model: null });
   } catch (err) {
@@ -432,9 +438,10 @@ app.post('/api/models', async (req: Request, res: Response): Promise<void> => {
 
 app.get('/api/skins/:steamid', async (req: Request, res: Response): Promise<void> => {
   try {
+    const steamid = getParamString(req.params['steamid']);
     const [rows] = await db.query<any[]>(
       'SELECT knife, gloves, ct_model, t_model, skins_json FROM ruh_player_skins WHERE steamid = ?',
-      [req.params['steamid']]
+      [steamid]
     );
     if (!rows[0]) {
       res.json({ knife: null, gloves: null, ct_model: null, t_model: null, skins: {} });
@@ -514,9 +521,10 @@ app.post('/api/tickets', async (req: Request, res: Response): Promise<void> => {
 
 app.get('/api/tickets/:steamid', async (req: Request, res: Response): Promise<void> => {
   try {
+    const steamid = getParamString(req.params['steamid']);
     const [rows] = await db.query(
       'SELECT * FROM ruh_tickets WHERE steamid = ? ORDER BY created_at DESC',
-      [req.params['steamid']]
+      [steamid]
     );
     res.json(rows);
   } catch (err) {
