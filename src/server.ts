@@ -1,5 +1,4 @@
 import "./lib/error-capture";
-import { renderErrorPage } from "./lib/error-page";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -18,7 +17,22 @@ async function getServerEntry(): Promise<ServerEntry> {
 
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
-    const handler = await getServerEntry();
-    return handler.fetch(request, env, ctx);
+    try {
+      const handler = await getServerEntry();
+      const response = await handler.fetch(request, env, ctx);
+      
+      if (response.status >= 500) {
+        const body = await response.clone().text();
+        console.error("SSR ERROR RESPONSE:", response.status, body);
+      }
+      
+      return response;
+    } catch (error) {
+      console.error("SSR CATCH ERROR:", error);
+      return new Response(JSON.stringify({ error: String(error), stack: (error as Error)?.stack }), {
+        status: 500,
+        headers: { "content-type": "application/json" },
+      });
+    }
   },
 };
