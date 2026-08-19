@@ -1,3 +1,6 @@
+import os
+import io
+import aiohttp
 import discord
 from discord.ext import commands
 from aiohttp import web
@@ -88,8 +91,6 @@ class OrderView(discord.ui.View):
                 pass
 
 
-import os
-
 class OrdersCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -109,6 +110,12 @@ async def setup_orders_webhook(bot, pool, app):
 
             channel_id = config.ORDERS_CHANNEL_ID
             channel = bot.get_channel(channel_id)
+            if not channel:
+                try:
+                    channel = await bot.fetch_channel(channel_id)
+                except Exception as ch_err:
+                    print(f"Failed to fetch channel {channel_id}: {ch_err}")
+                    channel = None
             
             if not channel:
                 print(f"Error: ORDERS_CHANNEL_ID {channel_id} not found!")
@@ -128,7 +135,18 @@ async def setup_orders_webhook(bot, pool, app):
                 discord_file = discord.File(screenshot_path, filename="kaspi_receipt.png")
                 embed.set_image(url="attachment://kaspi_receipt.png")
             elif screenshot_url:
-                embed.set_image(url=screenshot_url)
+                try:
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(screenshot_url, timeout=10) as resp:
+                            if resp.status == 200:
+                                img_data = await resp.read()
+                                discord_file = discord.File(io.BytesIO(img_data), filename="kaspi_receipt.png")
+                                embed.set_image(url="attachment://kaspi_receipt.png")
+                            else:
+                                embed.set_image(url=screenshot_url)
+                except Exception as img_err:
+                    print(f"Could not download screenshot from {screenshot_url}: {img_err}")
+                    embed.set_image(url=screenshot_url)
 
             embed.set_footer(text=f"Discord ID: {discord_id if discord_id else 'не верифицирован'} | Order #{order_id}")
 
