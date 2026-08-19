@@ -550,8 +550,7 @@ app.post('/api/orders', upload.single('screenshot'), async (req: Request, res: R
     }
 
     const price = VOUCHER_PRICES[voucher] || 1499;
-    const filename = req.file ? req.file.filename : null;
-    const baseUrl = process.env['VITE_SITE_URL'] || 'http://localhost:3001';
+    const baseUrl = process.env['PUBLIC_URL'] || process.env['VITE_API_URL'] || process.env['VITE_SITE_URL'] || 'http://localhost:3001';
     const screenshot_url = filename ? `${baseUrl}/uploads/${filename}` : null;
 
     const [result] = await db.query<any>(
