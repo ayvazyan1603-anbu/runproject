@@ -560,11 +560,11 @@ app.post('/api/orders', upload.single('screenshot'), async (req: Request, res: R
       [steamid, discord_id ? Number(discord_id) : null, player_name || 'Игрок', voucher, price, screenshot_url]
     );
 
-    const orderId = result.insertId;
+    const botWebhookUrl = process.env['BOT_WEBHOOK_URL'] || 'http://localhost:5000';
 
     // Send order webhook to Discord Bot
     try {
-      await fetch('http://localhost:5000/webhook/order', {
+      await fetch(`${botWebhookUrl}/webhook/order`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -604,9 +604,11 @@ app.post('/api/verify', async (req: Request, res: Response): Promise<void> => {
       [discord_id, steamid]
     );
 
+    const botWebhookUrl = process.env['BOT_WEBHOOK_URL'] || 'http://localhost:5000';
+
     // Forward verification webhook to Discord Bot
     try {
-      await fetch('http://localhost:5000/webhook/verify', {
+      await fetch(`${botWebhookUrl}/webhook/verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
