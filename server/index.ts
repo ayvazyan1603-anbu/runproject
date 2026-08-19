@@ -629,11 +629,36 @@ app.post('/api/verify', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
+app.get('/', (req: Request, res: Response) => {
+  res.json({ status: 'ok', service: 'RUH PROJECT API', timestamp: new Date().toISOString() });
+});
+
+app.get('/health', (req: Request, res: Response) => {
+  res.json({ status: 'healthy' });
+});
+
 export default app;
 
 if (!process.env['VERCEL']) {
-  const PORT = process.env['PORT'] || 3001;
-  app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+  const PORT = Number(process.env['PORT'] || 3001);
+  const HOST = '0.0.0.0';
+  const server = app.listen(PORT, HOST, () => {
+    console.log(`Server running on http://${HOST}:${PORT}`);
+  });
+
+  process.on('SIGTERM', () => {
+    console.log('SIGTERM signal received: closing HTTP server gracefully');
+    server.close(() => {
+      console.log('HTTP server closed');
+      process.exit(0);
+    });
+  });
+
+  process.on('SIGINT', () => {
+    console.log('SIGINT signal received: closing HTTP server gracefully');
+    server.close(() => {
+      console.log('HTTP server closed');
+      process.exit(0);
+    });
   });
 }
