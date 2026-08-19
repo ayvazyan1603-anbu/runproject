@@ -23,4 +23,4 @@ VOUCHER_PRICES = {
 }
 
 SITE_URL = os.getenv("VITE_SITE_URL", "http://localhost:8080")
-WEBHOOK_PORT = int(os.getenv("WEBHOOK_PORT", "5000"))
+WEBHOOK_PORT = int(os.getenv("PORT", os.getenv("WEBHOOK_PORT", "5000")))

@@ -561,7 +561,8 @@ app.post('/api/orders', upload.single('screenshot'), async (req: Request, res: R
     );
 
     const orderId = result?.insertId || 0;
-    const botWebhookUrl = process.env['BOT_WEBHOOK_URL'] || 'http://localhost:5000';
+    const rawBotUrl = process.env['BOT_WEBHOOK_URL'] || 'https://ruhbot-production.up.railway.app';
+    const botWebhookUrl = rawBotUrl.replace(/\/+$/, '');
 
     // Send order webhook to Discord Bot
     try {
@@ -605,7 +606,8 @@ app.post('/api/verify', async (req: Request, res: Response): Promise<void> => {
       [discord_id, steamid]
     );
 
-    const botWebhookUrl = process.env['BOT_WEBHOOK_URL'] || 'http://localhost:5000';
+    const rawBotUrl = process.env['BOT_WEBHOOK_URL'] || 'https://ruhbot-production.up.railway.app';
+    const botWebhookUrl = rawBotUrl.replace(/\/+$/, '');
 
     // Forward verification webhook to Discord Bot
     try {
