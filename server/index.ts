@@ -534,11 +534,11 @@ app.get('/api/tickets/:steamid', async (req: Request, res: Response): Promise<vo
 });
 
 const VOUCHER_PRICES: Record<string, number> = {
-  "VIP": 1499,
-  "BATYR": 2999,
-  "KHAN": 4399,
-  "SULTAN": 7999,
-  "RUH": 10999
+  "VIP": 2999,
+  "BATYR": 4999,
+  "KHAN": 7999,
+  "SULTAN": 9999,
+  "RUH": 14999
 };
 
 app.post('/api/orders', upload.single('screenshot'), async (req: Request, res: Response): Promise<void> => {
