@@ -109,17 +109,18 @@ async def setup_orders_webhook(bot, pool, app):
             discord_id = data.get('discord_id')
 
             channel_id = config.ORDERS_CHANNEL_ID
+            print(f"📩 [Webhook] Получен заказ #{order_id} для {player_name} ({steamid}), ваучер: {voucher}. Канал ID: {channel_id}")
             channel = bot.get_channel(channel_id)
             if not channel:
                 try:
                     channel = await bot.fetch_channel(channel_id)
                 except Exception as ch_err:
-                    print(f"Failed to fetch channel {channel_id}: {ch_err}")
+                    print(f"❌ [Webhook] Не удалось найти канал {channel_id}: {ch_err}")
                     channel = None
             
             if not channel:
-                print(f"Error: ORDERS_CHANNEL_ID {channel_id} not found!")
-                return web.json_response({"success": False, "error": "Orders channel not found"}, status=500)
+                print(f"❌ [Webhook] Канал заказов ORDERS_CHANNEL_ID={channel_id} не найден! Проверьте права бота.")
+                return web.json_response({"success": False, "error": f"Orders channel {channel_id} not found"}, status=500)
 
             embed = discord.Embed(
                 title="🛒 Новая заявка на ваучер (Kaspi Оплата)",
@@ -145,7 +146,7 @@ async def setup_orders_webhook(bot, pool, app):
                             else:
                                 embed.set_image(url=screenshot_url)
                 except Exception as img_err:
-                    print(f"Could not download screenshot from {screenshot_url}: {img_err}")
+                    print(f"⚠️ Не удалось загрузить скриншот чека из {screenshot_url}: {img_err}")
                     embed.set_image(url=screenshot_url)
 
             embed.set_footer(text=f"Discord ID: {discord_id if discord_id else 'не верифицирован'} | Order #{order_id}")
@@ -164,11 +165,19 @@ async def setup_orders_webhook(bot, pool, app):
             else:
                 await channel.send(embed=embed, view=view)
 
+            print(f"✅ [Webhook] Сообщение о заказе #{order_id} успешно отправлено в Discord канал #{channel.name}!")
             return web.json_response({"success": True})
         except Exception as e:
-            print("Webhook order processing error:", e)
+            import traceback
+            traceback.print_exc()
+            print("❌ Webhook order processing error:", e)
             return web.json_response({"success": False, "error": str(e)}, status=500)
 
+    async def handle_health(request):
+        return web.json_response({"status": "ok", "service": "RUH Discord Bot Webhook", "user": str(bot.user) if bot.user else "connecting"})
+
+    app.router.add_get('/', handle_health)
+    app.router.add_get('/health', handle_health)
     app.router.add_post('/webhook/order', handle_order)
 
 async def setup(bot):

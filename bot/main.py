@@ -13,79 +13,98 @@ from database import get_pool
 from cogs.orders import setup_orders_webhook
 from cogs.verification import setup_verification_webhook
 
+# Use default intents to ensure bot works even without Privileged Intents enabled in Dev Portal
 intents = discord.Intents.default()
-intents.members = True
-intents.message_content = True
+try:
+    intents.members = True
+except Exception:
+    pass
 
-bot = commands.Bot(command_prefix="!", intents=intents)
-pool = None
+class RuhBot(commands.Bot):
+    def __init__(self):
+        super().__init__(command_prefix="!", intents=intents)
+        self.pool = None
+        self.web_app = web.Application()
 
-@bot.event
-async def on_ready():
-    global pool
-    pool = await get_pool()
-    bot.pool = pool
+    async def setup_hook(self):
+        # Initialize database pool
+        try:
+            self.pool = await get_pool()
+            print("💾 База данных MySQL успешно подключена.")
+        except Exception as db_err:
+            print(f"⚠️ Ошибка подключения к MySQL: {db_err}")
 
-    # Load cogs
-    await bot.load_extension('cogs.orders')
-    await bot.load_extension('cogs.verification')
-    await bot.load_extension('cogs.profile')
-    await bot.load_extension('cogs.tickets')
+        # Load all cogs
+        for ext in ['cogs.orders', 'cogs.verification', 'cogs.profile', 'cogs.tickets']:
+            try:
+                await self.load_extension(ext)
+                print(f"📦 Загружен модуль: {ext}")
+            except Exception as e:
+                print(f"❌ Ошибка загрузки модуля {ext}: {e}")
 
-    # Register persistent views
-    from cogs.tickets import TicketCloseView
-    from cogs.verification import VerifyPanelView
-    bot.add_view(TicketCloseView())
-    bot.add_view(VerifyPanelView())
+        # Register persistent views
+        try:
+            from cogs.tickets import TicketCloseView
+            from cogs.verification import VerifyPanelView
+            self.add_view(TicketCloseView())
+            self.add_view(VerifyPanelView())
+        except Exception as v_err:
+            print(f"⚠️ Ошибка регистрации Views: {v_err}")
 
-    # Sync slash commands
-    try:
-        synced = await bot.tree.sync()
-        print(f"✅ Успешно синхронизировано {len(synced)} Slash-команд.")
-    except Exception as e:
-        print(f"❌ Ошибка синхронизации Slash-команд: {e}")
+        # Setup and start Webhook HTTP server
+        try:
+            await setup_orders_webhook(self, self.pool, self.web_app)
+            await setup_verification_webhook(self, self.pool, self.web_app)
 
-    print(f"🚀 Бот RUH PROJECT запущен: {bot.user} (ID: {bot.user.id})")
+            runner = web.AppRunner(self.web_app)
+            await runner.setup()
+            port = int(getattr(config, 'WEBHOOK_PORT', 5000) or 5000)
+            site = web.TCPSite(runner, '0.0.0.0', port)
+            await site.start()
+            print(f"📡 Webhook сервер запущен на http://0.0.0.0:{port}")
+        except Exception as w_err:
+            print(f"❌ Ошибка запуска Webhook сервера: {w_err}")
 
-# Webhook server
-app = web.Application()
+    async def on_ready(self):
+        print(f"🚀 Бот RUH PROJECT запущен: {self.user} (ID: {self.user.id})")
+        # Sync slash commands
+        try:
+            synced = await self.tree.sync()
+            print(f"✅ Успешно синхронизировано {len(synced)} Slash-команд.")
+        except Exception as e:
+            print(f"❌ Ошибка синхронизации Slash-команд: {e}")
 
-async def start_webhook():
-    await setup_orders_webhook(bot, pool, app)
-    await setup_verification_webhook(bot, pool, app)
+    async def close(self):
+        if self.pool:
+            self.pool.close()
+            await self.pool.wait_closed()
+        await super().close()
 
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, '0.0.0.0', config.WEBHOOK_PORT)
-    await site.start()
-    print(f"📡 Webhook сервер запущен на http://localhost:{config.WEBHOOK_PORT}")
+bot = RuhBot()
 
-async def main():
-    if not config.TOKEN or config.TOKEN == "YOUR_BOT_TOKEN_HERE":
+async def run_bot():
+    token = getattr(config, 'TOKEN', None)
+    if not token or token == "YOUR_BOT_TOKEN_HERE":
         print("\n❌ ОШИБКА: Не указан токен Discord бота!")
-        print("📌 Вставьте токен вашего бота в файл bot/config.py (переменная TOKEN = \"...\") или в bot/.env (DISCORD_BOT_TOKEN=...)\n")
+        print("📌 Укажите переменную окружения DISCORD_BOT_TOKEN\n")
         return
 
-    async with bot:
-        global pool
-        pool = await get_pool()
-        bot.pool = pool
-        
-        await start_webhook()
-        try:
-            await bot.start(config.TOKEN)
-        finally:
-            if pool:
-                pool.close()
-                await pool.wait_closed()
+    try:
+        await bot.start(token)
+    except discord.errors.PrivilegedIntentsRequired:
+        print("\n⚠️ ВНИМАНИЕ: Discord требует включить 'Server Members Intent'. Перезапуск со стандартными правами...")
+        # Fallback to standard default intents without members intent
+        fallback_intents = discord.Intents.default()
+        fallback_bot = RuhBot()
+        fallback_bot.intents = fallback_intents
+        await fallback_bot.start(token)
+    except discord.errors.LoginFailure:
+        print("\n❌ ОШИБКА АВТОРИЗАЦИИ: Передан неверный токен Discord бота!")
+    except Exception as e:
+        print(f"\n❌ Ошибка при работе бота: {e}")
 
 if __name__ == '__main__':
     try:
-        asyncio.run(main())
+        asyncio.run(run_bot())
     except KeyboardInterrupt:
         print("\n🛑 Бот остановлен.")
-    except discord.errors.LoginFailure:
-        print("\n❌ ОШИБКА АВТОРИЗАЦИИ: Передан неверный токен Discord бота!")
-        print("📌 Проверьте токен в bot/config.py или bot/.env\n")
-    except Exception as e:
-        print(f"\n❌ Ошибка при работе бота: {e}")
