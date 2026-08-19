@@ -96,6 +96,13 @@ async def setup_verification_webhook(bot, pool, app):
             await save_verification(pool, discord_id, steamid)
 
             guild = bot.get_guild(config.GUILD_ID)
+            if not guild:
+                try:
+                    guild = await bot.fetch_guild(config.GUILD_ID)
+                except Exception as g_err:
+                    print(f"Failed to fetch guild {config.GUILD_ID}: {g_err}")
+                    guild = None
+
             if guild:
                 member = guild.get_member(discord_id)
                 if not member:
