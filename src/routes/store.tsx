@@ -100,32 +100,22 @@ function Store() {
       formData.append("discord_id", "");
       formData.append("screenshot", screenshotFile);
 
-      let res: Response | null = null;
-      try {
-        res = await fetch("http://localhost:3001/api/orders", {
-          method: "POST",
-          body: formData,
-        });
-      } catch {
-        try {
-          res = await fetch("/api/orders", {
-            method: "POST",
-            body: formData,
-          });
-        } catch {
-          res = null;
-        }
+      const API_URL = (import.meta.env["VITE_API_URL"] as string | undefined) ?? "";
+      const endpoint = API_URL ? `${API_URL}/api/orders` : "/api/orders";
+
+      const res = await fetch(endpoint, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(errData.error || `Ошибка сервера (${res.status})`);
       }
 
-      if (res && res.ok) {
-        toast.success("🚀 Заявка успешно отправлена!", {
-          description: "Администрация проверит чек оплаты в Discord и выдаст ваучер.",
-        });
-      } else {
-        toast.success("✅ Заявка зафиксирована!", {
-          description: "Для отправки чека в Discord запустите Express сервер (npm run dev:all).",
-        });
-      }
+      toast.success("🚀 Заявка успешно отправлена!", {
+        description: "Администрация проверит чек оплаты в Discord и выдаст ваучер.",
+      });
 
       setBuyTarget(null);
       setScreenshotFile(null);
