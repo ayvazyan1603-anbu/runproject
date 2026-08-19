@@ -549,7 +549,8 @@ app.post('/api/orders', upload.single('screenshot'), async (req: Request, res: R
       return;
     }
 
-    const price = VOUCHER_PRICES[voucher] || 1499;
+    const price = VOUCHER_PRICES[voucher] || 2999;
+    const filename = req.file ? req.file.filename : null;
     const baseUrl = process.env['PUBLIC_URL'] || process.env['VITE_API_URL'] || process.env['VITE_SITE_URL'] || 'http://localhost:3001';
     const screenshot_url = filename ? `${baseUrl}/uploads/${filename}` : null;
 
@@ -559,6 +560,7 @@ app.post('/api/orders', upload.single('screenshot'), async (req: Request, res: R
       [steamid, discord_id ? Number(discord_id) : null, player_name || 'Игрок', voucher, price, screenshot_url]
     );
 
+    const orderId = result?.insertId || 0;
     const botWebhookUrl = process.env['BOT_WEBHOOK_URL'] || 'http://localhost:5000';
 
     // Send order webhook to Discord Bot
@@ -582,9 +584,9 @@ app.post('/api/orders', upload.single('screenshot'), async (req: Request, res: R
     }
 
     res.json({ success: true, message: 'Заявка отправлена! Ожидайте подтверждения администратора.' });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to create order' });
+  } catch (err: any) {
+    console.error('Failed to create order error:', err);
+    res.status(500).json({ error: err?.message || 'Failed to create order' });
   }
 });
 
