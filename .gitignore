@@ -20,6 +20,14 @@ dist-ssr
 bot/.env
 *.env
 
+# Python
+__pycache__/
+*.py[cod]
+*.pyc
+venv/
+.venv/
+env/
+
 # Wrangler / Cloudflare
 .wrangler/
 .dev.vars
