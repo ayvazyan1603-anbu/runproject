@@ -257,7 +257,7 @@ function Store() {
                 <div className="text-xs text-purple-300 bg-purple-950/40 p-3 rounded-lg border border-purple-800/50">
                   <p className="font-semibold mb-1">📲 Инструкция оплаты через Kaspi:</p>
                   <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
-                    <li>Переведите сумму <strong>{buyTarget.price} ₸</strong> по номеру Kaspi: <strong>+7 700 000 0000</strong></li>
+                    <li>Переведите сумму <strong>{buyTarget.price.toLocaleString("ru-RU")} ₸</strong> по номеру Kaspi / карты: <strong className="text-white font-mono bg-purple-900/40 px-1.5 py-0.5 rounded border border-purple-700/50 select-all">4400 4303 8627 6650</strong></li>
                     <li>В сообщении к переводу укажите ваш SteamID: <code className="text-purple-300">{customSteamId}</code></li>
                     <li>Сделайте скриншот чека оплаты и прикрепите его ниже.</li>
                   </ol>

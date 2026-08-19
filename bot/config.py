@@ -15,11 +15,11 @@ DB_USER = os.getenv("DB_USER", "sql_9326_free")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "KkrmQZqkfL")
 
 VOUCHER_PRICES = {
-    "VIP": 1499,
-    "BATYR": 2999,
-    "KHAN": 4399,
-    "SULTAN": 7999,
-    "RUH": 10999
+    "VIP": 2999,
+    "BATYR": 4999,
+    "KHAN": 7999,
+    "SULTAN": 9999,
+    "RUH": 14999
 }
 
 SITE_URL = os.getenv("VITE_SITE_URL", "http://localhost:8080")
